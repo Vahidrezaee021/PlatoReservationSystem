@@ -8,7 +8,6 @@ namespace PlatoReservation.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize] // فقط کاربران لاگین‌کرده می‌توانند رزرو کنند
 public class BookingsController : ControllerBase
 {
     private readonly BookingService _bookingService;
@@ -18,35 +17,17 @@ public class BookingsController : ControllerBase
         _bookingService = bookingService;
     }
 
-    // POST /api/bookings (ثبت رزرو جدید - نقش Artist)
     [HttpPost]
-    [Authorize(Roles = "Artist")]
+    [Authorize]
     public async Task<IActionResult> Create([FromBody] CreateBookingDto dto)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userIdClaim == null) return Unauthorized();
 
         int userId = int.Parse(userIdClaim);
+        var (ok, message, data) = await _bookingService.CreateBookingAsync(userId, dto);
+        if (!ok) return BadRequest(new { message });
 
-        var result = await _bookingService.CreateBookingAsync(userId, dto);
-        if (!result.Success)
-        {
-            return BadRequest(new { message = result.Message });
-        }
-
-        return Ok(new { message = result.Message, bookingId = result.BookingId });
-    }
-
-    // GET /api/bookings (مشاهده رزروهای کاربر جاری)
-    [HttpGet]
-    public async Task<IActionResult> GetMyBookings()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim == null) return Unauthorized();
-
-        int userId = int.Parse(userIdClaim);
-        var bookings = await _bookingService.GetUserBookingsAsync(userId);
-
-        return Ok(bookings);
+        return Ok(new { message, data });
     }
 }

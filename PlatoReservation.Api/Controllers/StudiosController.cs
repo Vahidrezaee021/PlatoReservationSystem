@@ -17,25 +17,31 @@ public class StudiosController : ControllerBase
         _studioService = studioService;
     }
 
-    // GET /api/studios (همه می‌توانند ببینند - نیازی به توکن ندارد)
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAll()
     {
         var studios = await _studioService.GetAllStudiosAsync();
         return Ok(studios);
     }
 
-    // POST /api/studios (فقط صاحبان پلاتو با داشتن توکن می‌توانند پلاتو ثبت کنند)
+    [HttpGet("{id}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetById(int id)
+    {
+        var studio = await _studioService.GetStudioByIdAsync(id);
+        if (studio == null) return NotFound(new { message = "پلاتو مورد نظر یافت نشد." });
+        return Ok(studio);
+    }
+
     [HttpPost]
     [Authorize(Roles = "Owner")]
     public async Task<IActionResult> Create([FromBody] CreateStudioDto dto)
     {
-        // استخراج شناسه کاربر از توکن JWT
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userIdClaim == null) return Unauthorized();
 
         int ownerId = int.Parse(userIdClaim);
-
         var success = await _studioService.CreateStudioAsync(ownerId, dto);
         if (!success) return BadRequest(new { message = "خطا در ثبت پلاتو." });
 

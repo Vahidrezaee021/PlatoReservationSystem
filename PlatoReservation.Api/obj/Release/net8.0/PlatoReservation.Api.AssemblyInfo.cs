@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PlatoReservation.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bf000d2e530a2c76548e7505e4b1806702db3f3b")]
 [assembly: System.Reflection.AssemblyProductAttribute("PlatoReservation.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PlatoReservation.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

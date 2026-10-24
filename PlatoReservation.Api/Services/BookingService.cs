@@ -3,87 +3,106 @@ using PlatoReservation.Api.Data;
 using PlatoReservation.Api.Dtos;
 using PlatoReservation.Api.Entities;
 
-namespace PlatoReservation.Api.Services;
-
-public class BookingService
+namespace PlatoReservation.Api.Services
 {
-    private readonly AppDbContext _db;
-
-    public BookingService(AppDbContext db)
+    public interface IBookingService
     {
-        _db = db;
+        Task<(bool Success, string Message, BookingDto? Data)> CreateBookingAsync(int userId, CreateBookingDto dto);
+        Task<List<BookingDto>> GetStudioBookingsAsync(int studioId);
+        Task<bool> DeleteBookingAsync(int bookingId, int userId);
     }
 
-    // ثبت رزرو جدید با بررسی دقیق تداخل زمانی
-    public async Task<(bool Success, string Message, int BookingId)> CreateBookingAsync(int userId, CreateBookingDto dto)
+    public class BookingService : IBookingService
     {
-        // ۱. پیدا کردن پلاتو و بررسی فعال بودن آن
-        var studio = await _db.Studios.FirstOrDefaultAsync(s => s.Id == dto.StudioId && s.IsActive);
-        if (studio == null)
+        private readonly AppDbContext _context;
+
+        public BookingService(AppDbContext context)
         {
-            return (false, "پلاتوی مورد نظر یافت نشد یا غیرفعال است.", 0);
+            _context = context;
         }
 
-        // ۲. بررسی اعتبار زمان (ساعت پایان باید بعد از ساعت شروع باشد)
-        if (dto.EndTime <= dto.StartTime)
+        public async Task<(bool Success, string Message, BookingDto? Data)> CreateBookingAsync(int userId, CreateBookingDto dto)
         {
-            return (false, "ساعت پایان باید بعد از ساعت شروع باشد.", 0);
+            var studio = await _context.Studios.FindAsync(dto.StudioId);
+            if (studio == null || !studio.IsActive)
+                return (false, "پلاتوی مورد نظر یافت نشد یا غیرفعال است.", null);
+
+            if (dto.EndTime <= dto.StartTime)
+                return (false, "زمان پایان باید بعد از زمان شروع باشد.", null);
+
+            // بررسی تداخل زمان رزرو
+            var hasOverlap = await _context.Bookings.AnyAsync(b =>
+                b.StudioId == dto.StudioId &&
+                b.Status != "Cancelled" &&
+                dto.StartTime < b.EndTime &&
+                b.StartTime < dto.EndTime
+            );
+
+            if (hasOverlap)
+                return (false, "این بازه زمانی قبلاً توسط شخص دیگری رزرو شده است.", null);
+
+            // محاسبه مبلغ کل بر اساس نرخ ساعتی پلاتو
+            var hours = (decimal)(dto.EndTime - dto.StartTime).TotalHours;
+            if (hours <= 0) return (false, "بازه زمانی نامعتبر است.", null);
+
+            decimal totalPrice = Math.Round(hours * studio.HourlyRate, 0);
+
+            var booking = new Booking
+            {
+                StudioId = dto.StudioId,
+                UserId = userId,
+                StartTime = dto.StartTime,
+                EndTime = dto.EndTime,
+                TotalPrice = totalPrice,
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.Bookings.Add(booking);
+            await _context.SaveChangesAsync();
+
+            var resultDto = new BookingDto
+            {
+                Id = booking.Id,
+                StudioId = booking.StudioId,
+                StudioTitle = studio.Title, // <-- اصلاح شد به Title
+                StartTime = booking.StartTime,
+                EndTime = booking.EndTime,
+                TotalPrice = booking.TotalPrice,
+                Status = booking.Status,
+                CreatedAt = booking.CreatedAt
+            };
+
+            return (true, "رزرو با موفقیت ثبت شد.", resultDto);
         }
 
-        // ۳. بررسی تداخل زمانی (Overlap Check)
-        // فرمول تداخل: رزرو جدید با رزروهای قبلی تداخل دارد اگر:
-        // (StartTime < ExistingEnd) AND (EndTime > ExistingStart)
-        var hasOverlap = await _db.Bookings
-            .AnyAsync(b => b.StudioId == dto.StudioId &&
-                           b.Status != "Cancelled" &&
-                           dto.StartTime < b.EndTime &&
-                           dto.EndTime > b.StartTime);
-
-        if (hasOverlap)
+        public async Task<List<BookingDto>> GetStudioBookingsAsync(int studioId)
         {
-            return (false, "این پلاتو در بازه زمانی انتخاب شده قبلاً رزرو شده است.", 0);
+            return await _context.Bookings
+                .Where(b => b.StudioId == studioId && b.Status != "Cancelled")
+                .Include(b => b.Studio)
+                .Select(b => new BookingDto
+                {
+                    Id = b.Id,
+                    StudioId = b.StudioId,
+                    StudioTitle = b.Studio != null ? b.Studio.Title : "پلاتو", // <-- اصلاح شد به Title
+                    StartTime = b.StartTime,
+                    EndTime = b.EndTime,
+                    TotalPrice = b.TotalPrice,
+                    Status = b.Status,
+                    CreatedAt = b.CreatedAt
+                })
+                .ToListAsync();
         }
 
-        // ۴. محاسبه قیمت کل
-        var totalHours = (decimal)(dto.EndTime - dto.StartTime).TotalHours;
-        var totalPrice = totalHours * studio.HourlyRate;
-
-        // ۵. ایجاد رکورد رزرو
-        var booking = new Booking
+        public async Task<bool> DeleteBookingAsync(int bookingId, int userId)
         {
-            StudioId = dto.StudioId,
-            UserId = userId,
-            StartTime = dto.StartTime,
-            EndTime = dto.EndTime,
-            TotalPrice = totalPrice,
-            Status = "PendingPayment", // در انتظار پرداخت
-            CreatedAt = DateTime.UtcNow
-        };
+            var booking = await _context.Bookings.FindAsync(bookingId);
+            if (booking == null || booking.UserId != userId) return false;
 
-        _db.Bookings.Add(booking);
-        await _db.SaveChangesAsync();
-
-        return (true, "رزرو با موفقیت ثبت شد. لطفاً به بخش پرداخت مراجعه کنید.", booking.Id);
-    }
-
-    // گرفتن لیست رزروهای کاربر
-    public async Task<List<BookingDto>> GetUserBookingsAsync(int userId)
-    {
-        var bookings = await _db.Bookings
-            .Include(b => b.Studio)
-            .Where(b => b.UserId == userId)
-            .ToListAsync();
-
-        return bookings.Select(b => new BookingDto
-        {
-            Id = b.Id,
-            StudioId = b.StudioId,
-            StudioTitle = b.Studio.Title,
-            StartTime = b.StartTime,
-            EndTime = b.EndTime,
-            TotalPrice = b.TotalPrice,
-            Status = b.Status,
-            CreatedAt = b.CreatedAt
-        }).ToList();
+            _context.Bookings.Remove(booking);
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }

@@ -36,9 +36,37 @@ public class StudioService
             IsActive = s.IsActive,
             OpenTime = s.OpenTime,
             CloseTime = s.CloseTime,
-            OwnerName = s.Owner.FullName,
+            OwnerName = s.Owner?.FullName ?? "",
             Features = s.Features.Select(f => f.Title).ToList()
         }).ToList();
+    }
+
+    // دریافت جزئیات یک پلاتو با شناسه
+    public async Task<StudioDto?> GetStudioByIdAsync(int id)
+    {
+        var s = await _db.Studios
+            .Include(x => x.Owner)
+            .Include(x => x.Features)
+            .FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
+
+        if (s == null) return null;
+
+        return new StudioDto
+        {
+            Id = s.Id,
+            Title = s.Title,
+            Description = s.Description,
+            Address = s.Address,
+            City = s.City,
+            AreaInMeters = s.AreaInMeters,
+            HourlyRate = s.HourlyRate,
+            ImageUrl = s.ImageUrl,
+            IsActive = s.IsActive,
+            OpenTime = s.OpenTime,
+            CloseTime = s.CloseTime,
+            OwnerName = s.Owner?.FullName ?? "",
+            Features = s.Features.Select(f => f.Title).ToList()
+        };
     }
 
     // ثبت پلاتوی جدید توسط صاحب پلاتو
@@ -62,7 +90,6 @@ public class StudioService
         _db.Studios.Add(studio);
         await _db.SaveChangesAsync();
 
-        // ثبت امکانات پلاتو
         if (dto.Features != null && dto.Features.Any())
         {
             foreach (var featureTitle in dto.Features)

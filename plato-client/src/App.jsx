@@ -5,6 +5,7 @@ import faIR from "antd/locale/fa_IR";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AuthPage } from "./pages/AuthPage";
 import { HomePage } from "./pages/HomePage"; // اضافه کردن HomePage
+import  StudioDetail  from "./pages/StudioDetail";
 
 const { Header, Content, Footer } = Layout;
 
@@ -67,6 +68,9 @@ export default function App() {
                 <Route path="/" element={<HomePage />} />{" "}
                 {/* اتصال مسیر اصلی به HomePage */}
                 <Route path="/auth" element={<AuthPage />} />
+                <Route path="/studio/:id" element={<StudioDetail />} />
+                <Route path="/booking/:id" element={<StudioDetail />} />
+
               </Routes>
             </Content>
             <Footer style={{ textAlign: "center", color: "#888" }}>
