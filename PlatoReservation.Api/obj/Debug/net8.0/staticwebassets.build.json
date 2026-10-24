@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "lgHF4GgHog/FcvuCUySaoZLWXViNEwLxv34iv0U9Q/M=",
+  "Source": "PlatoReservation.Api",
+  "BasePath": "_content/PlatoReservation.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

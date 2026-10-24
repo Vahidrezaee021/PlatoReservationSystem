@@ -1,0 +1,6 @@
+@PlatoReservation.Api_HostAddress = http://localhost:5051
+
+GET {{PlatoReservation.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
